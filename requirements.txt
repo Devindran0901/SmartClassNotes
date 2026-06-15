@@ -1,0 +1,8 @@
+streamlit
+requests
+supabase
+fpdf2
+python-docx
+openai-whisper
+yt-dlp
+google-generativeai
