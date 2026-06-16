@@ -29,19 +29,25 @@ def transcribe_audio(file_path: str) -> str:
     except Exception as e: raise Exception(f"Audio Transcription Failed: {str(e)}")
 
 def transcribe_youtube(youtube_url: str):
-    import yt_dlp as youtube_dl
-    ydl_opts = {
-        "format": "bestaudio/best",
-        "outtmpl": os.path.join(tempfile.gettempdir(), "yt_audio_%(id)s.%(ext)s"),
-        "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "128"}],
-        "quiet": True, "nocheckcertificate": True,
-    }
     try:
-        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(youtube_url, download=True)
-            filename = ydl.prepare_filename(info).replace(".webm", ".mp3").replace(".m4a", ".mp3")
-        return transcribe_audio(filename), filename
-    except Exception as e: raise Exception(f"YouTube Download Failed: {str(e)}")
+        from youtube_transcript_api import YouTubeTranscriptApi
+
+        # Extract video ID from URL
+        match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11})", youtube_url)
+        if not match:
+            raise Exception("Could not extract video ID from URL.")
+
+        video_id = match.group(1)
+
+        # Fetch transcript
+        transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+
+        # Join all transcript text
+        transcript = " ".join([entry["text"] for entry in transcript_list])
+
+        return transcript, None
+    except Exception as e:
+        raise Exception(f"YouTube Transcript Failed: {str(e)}")
 
 def _sanitize_text(text):
     if not isinstance(text, str): return str(text)
@@ -74,7 +80,7 @@ def export_to_pdf(analysis: dict, out="lecture_summary.pdf"):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 12, "SMARTIE - Complete AI Analysis", ln=True, align="C")
+    pdf.cell(0, 12, "SmartClassNotes - Complete AI Analysis", ln=True, align="C")
     pdf.ln(4)
     for title, content in _get_all_sections(analysis):
         if content:
@@ -87,7 +93,7 @@ def export_to_pdf(analysis: dict, out="lecture_summary.pdf"):
 
 def export_to_word(analysis: dict, out="lecture_summary.docx"):
     doc = Document()
-    doc.add_heading("SMARTIE - Complete AI Analysis", 0)
+    doc.add_heading("SmartClassNotes - Complete AI Analysis", 0)
     for title, content in _get_all_sections(analysis):
         if content:
             doc.add_heading(title, level=1)
@@ -109,7 +115,8 @@ def process_input(text=None, source_type="text", file_path=None, youtube_url=Non
             extracted_content = transcribe_audio(file_path)
         elif source_type == "youtube" and youtube_url:
             extracted_content, tmp = transcribe_youtube(youtube_url)
-            cleanup.append(tmp)
+            if tmp:
+                cleanup.append(tmp)
         else:
             return {"error": "Invalid input method."}
 
@@ -181,7 +188,7 @@ Output EXACTLY this JSON structure:
 
         for f in cleanup:
             try:
-                if os.path.exists(f):
+                if f and os.path.exists(f):
                     os.remove(f)
             except Exception:
                 pass
