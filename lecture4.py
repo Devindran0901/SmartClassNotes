@@ -25,39 +25,50 @@ def _get_whisper():
     return _whisper_model
 
 def transcribe_audio(file_path: str) -> str:
-    try: return _get_whisper().transcribe(file_path)["text"]
-    except Exception as e: raise Exception(f"Audio Transcription Failed: {str(e)}")
+    try:
+        return _get_whisper().transcribe(file_path)["text"]
+    except Exception as e:
+        raise Exception(f"Audio Transcription Failed: {str(e)}")
 
 def transcribe_youtube(youtube_url: str):
     try:
         from youtube_transcript_api import YouTubeTranscriptApi
 
-        # Extract video ID from URL
         match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11})", youtube_url)
         if not match:
             raise Exception("Could not extract video ID from URL.")
 
         video_id = match.group(1)
 
-        # NEW (version 1.2.4)
-ytt_api = YouTubeTranscriptApi()
-fetched = ytt_api.fetch(video_id)
-transcript = " ".join([entry.text for entry in fetched])
+        ytt_api = YouTubeTranscriptApi()
+        fetched = ytt_api.fetch(video_id)
+        transcript = " ".join([entry.text for entry in fetched])
 
         return transcript, None
     except Exception as e:
         raise Exception(f"YouTube Transcript Failed: {str(e)}")
 
 def _sanitize_text(text):
-    if not isinstance(text, str): return str(text)
-    replacements = {'\u2013': '-', '\u2014': '-', '\u2018': "'", '\u2019': "'", '\u201c': '"', '\u201d': '"', '\u2026': '...'}
-    for k, v in replacements.items(): text = text.replace(k, v)
+    if not isinstance(text, str):
+        return str(text)
+    replacements = {
+        '\u2013': '-', '\u2014': '-',
+        '\u2018': "'", '\u2019': "'",
+        '\u201c': '"', '\u201d': '"',
+        '\u2026': '...'
+    }
+    for k, v in replacements.items():
+        text = text.replace(k, v)
     return text.encode('latin-1', 'replace').decode('latin-1')
 
 def _format_content_for_export(val):
-    """Flattens lists and dictionaries into readable strings for full document building."""
-    if isinstance(val, list): return "\n".join(f"• {v}" for v in val)
-    if isinstance(val, dict): return "\n\n".join(f"{k.replace('_', ' ').title()}:\n{_format_content_for_export(v)}" for k, v in val.items())
+    if isinstance(val, list):
+        return "\n".join(f"• {v}" for v in val)
+    if isinstance(val, dict):
+        return "\n\n".join(
+            f"{k.replace('_', ' ').title()}:\n{_format_content_for_export(v)}"
+            for k, v in val.items()
+        )
     return str(val)
 
 def _get_all_sections(analysis: dict):
@@ -72,7 +83,7 @@ def _get_all_sections(analysis: dict):
         ("Exam Preparation", analysis.get("exam_prep")),
         ("70% Length Reduction", analysis.get("reduction_70")),
         ("30% Length Reduction", analysis.get("reduction_30")),
-        ("10% Length Reduction", analysis.get("reduction_10"))
+        ("10% Length Reduction", analysis.get("reduction_10")),
     ]
 
 def export_to_pdf(analysis: dict, out="lecture_summary.pdf"):
@@ -122,7 +133,7 @@ def process_input(text=None, source_type="text", file_path=None, youtube_url=Non
         if not extracted_content.strip() or len(extracted_content) < 15:
             return {"error": "No viable structural textual context could be analyzed."}
 
-        system_prompt = '''
+        system_prompt = """
 You are the premier AI processing core of SmartClassNotes.
 Analyze the provided text and extract comprehensive academic parameters.
 You MUST output ONLY a raw JSON object. Do not include markdown formatting or backticks.
@@ -147,7 +158,8 @@ Output EXACTLY this JSON structure:
   "reduction_30": "Medium 70% length version of the text.",
   "reduction_10": "Exhaustive 90% length retention version."
 }
-'''
+"""
+
         try:
             model = genai.GenerativeModel(
                 model_name="gemini-2.5-flash",
@@ -163,7 +175,6 @@ Output EXACTLY this JSON structure:
 
             raw_json = response.text.strip()
 
-            # Strip markdown fences if model hallucinates them
             if raw_json.startswith("```"):
                 raw_json = re.sub(r'^```(?:json)?\n?', '', raw_json)
                 raw_json = re.sub(r'\n?```$', '', raw_json)
