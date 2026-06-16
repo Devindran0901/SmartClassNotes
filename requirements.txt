@@ -6,3 +6,4 @@ python-docx
 openai-whisper
 yt-dlp
 google-generativeai
+youtube-transcript-api
