@@ -39,11 +39,10 @@ def transcribe_youtube(youtube_url: str):
 
         video_id = match.group(1)
 
-        # Fetch transcript
-        transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
-
-        # Join all transcript text
-        transcript = " ".join([entry["text"] for entry in transcript_list])
+        # NEW (version 1.2.4)
+ytt_api = YouTubeTranscriptApi()
+fetched = ytt_api.fetch(video_id)
+transcript = " ".join([entry.text for entry in fetched])
 
         return transcript, None
     except Exception as e:
